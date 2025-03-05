@@ -137,12 +137,39 @@ label {
   font-size: 14px;
 }
 
+/* Style for facet selector */
+.facet-selector {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f0f7ff;
+  border-radius: 5px;
+  border: 1px solid #d0e0f0;
+}
+
+.facet-selector select {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border-radius: 4px;
+  border: 1px solid #a0c0e0;
+  font-size: 14px;
+}
 </style>
 </header>
 <body>
-<!-- New: Axis Selection Controls -->
+<!-- New: Axis and Facet Selection Controls -->
 <div style="width:90%; margin-left:5%; margin-right:5%; margin-top:20px; margin-bottom:20px; text-align:center;">
-  <div class="axis-selector" style="display:inline-block; width:40%; margin-right:5%;">
+  <!-- Add Facet Selector -->
+  <div class="facet-selector" style="display:inline-block; width:25%; margin-right:5%;">
+    <h3>Facet by</h3>
+    <select id="facet-selector" onchange="updateAxesAndPlot()">
+      <option value="PlacementStatus">Placement Status</option>
+      <option value="PlacementTraining">Placement Training</option>
+      <option value="ExtracurricularActivities">Extracurricular Activities</option>
+    </select>
+  </div>
+  
+  <div class="axis-selector" style="display:inline-block; width:30%; margin-right:5%;">
     <h3>X-Axis Selection</h3>
     <select id="x-axis-selector" onchange="updateAxesAndPlot()">
       <option value="AptitudeTestScore" selected>AptitudeTestScore</option>
@@ -152,7 +179,7 @@ label {
       <option value="HSC_Marks">HSC_Marks</option>
     </select>
   </div>
-  <div class="axis-selector" style="display:inline-block; width:40%;">
+  <div class="axis-selector" style="display:inline-block; width:30%;">
     <h3>Y-Axis Selection</h3>
     <select id="y-axis-selector" onchange="updateAxesAndPlot()">
       <option value="CGPA" selected>CGPA</option>
@@ -227,6 +254,22 @@ let currentAxisRanges = {};
 currentAxisRanges['{{column}}'] = [{{min}}, {{max}}];
 {% endfor %}
 
+// Get facet labels based on selected facet
+function getFacetLabels() {
+    const facetColumn = document.getElementById('facet-selector').value;
+    let facetValues = [];
+    
+    if (facetColumn === 'PlacementStatus') {
+        facetValues = ['Placed', 'NotPlaced'];
+    } else if (facetColumn === 'PlacementTraining') {
+        facetValues = ['Yes', 'No'];
+    } else if (facetColumn === 'ExtracurricularActivities') {
+        facetValues = ['Yes', 'No'];
+    }
+    
+    return { facetColumn, facetValues };
+}
+
 // Initialize plots with default axes
 function initializePlots() {
     // Clear existing plots
@@ -241,13 +284,16 @@ function initializePlots() {
     const xRange = currentAxisRanges[xAxis];
     const yRange = currentAxisRanges[yAxis];
     
-    // Create "Placed" scatterplot
-    placed_svg = draw_svg('placed-scatter', margin, width, height, "PlacementStatus: Placed");
+    // Get facet information
+    const { facetColumn, facetValues } = getFacetLabels();
+    
+    // Create first facet scatterplot
+    placed_svg = draw_svg('placed-scatter', margin, width, height, `${facetColumn}: ${facetValues[0]}`);
     placed_scale = draw_axes('placed-scatter', placed_svg, width, height, xRange, yRange);
     add_scatterplot_elements(placed_svg, width, height, xAxis, yAxis);
     
-    // Create "Not Placed" scatterplot
-    not_placed_svg = draw_svg('not-placed-scatter', margin, width, height, "PlacementStatus: NotPlaced");
+    // Create second facet scatterplot
+    not_placed_svg = draw_svg('not-placed-scatter', margin, width, height, `${facetColumn}: ${facetValues[1]}`);
     not_placed_scale = draw_axes('not-placed-scatter', not_placed_svg, width, height, xRange, yRange);
     add_scatterplot_elements(not_placed_svg, width, height, xAxis, yAxis);
 }

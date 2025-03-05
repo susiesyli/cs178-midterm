@@ -11,6 +11,7 @@ function draw_svg(container_id, margin, width, height, title){
     
     // Add the title to the SVG
     svg.append("text")
+        .attr("id", container_id + "-title")  // Add ID for dynamic updates
         .attr("x", (width + margin.left + margin.right) / 2)
         .attr("y", margin.top / 2)
         .attr("text-anchor", "middle")
@@ -92,7 +93,7 @@ function draw_axes(plot_name, svg, width, height, domainx, domainy) {
     return {'x': x_scale, 'y': y_scale};
 }
 
-function draw_slider(column, min, max, placed_svg, not_placed_svg, placed_scale, not_placed_scale){
+function draw_slider(column, min, max, chart1_svg, chart2_svg, chart1_scale, chart2_scale){
     slider = document.getElementById(column+'-slider')
     
     // If slider already has noUiSlider, destroy it first
@@ -146,7 +147,7 @@ function draw_slider(column, min, max, placed_svg, not_placed_svg, placed_scale,
     sliderContainer.appendChild(maxLabel);
     
     slider.noUiSlider.on('change', function(){
-        update(placed_svg, not_placed_svg, placed_scale, not_placed_scale)
+        update(chart1_svg, chart2_svg, chart1_scale, chart2_scale)
     });
 }
 
@@ -208,7 +209,35 @@ function add_scatterplot_elements(svg, width, height, xAxisName, yAxisName) {
         .text(yAxisName);
 }
 
-// Function that extracts the selected extracurricular activities and min/max values for sliders
+// Add a new function to draw the line of best fit
+function draw_line_of_best_fit(svg, scale, lineData, className) {
+    // If no line data or insufficient points, don't draw
+    if (!lineData) return;
+
+    // Calculate start and end points of the line based on the best fit parameters
+    const x1 = lineData.min_x;
+    const x2 = lineData.max_x;
+    
+    // Calculate corresponding y values using y = mx + b
+    const y1 = lineData.slope * x1 + lineData.intercept;
+    const y2 = lineData.slope * x2 + lineData.intercept;
+
+    // Remove any existing line of best fit with this class name
+    svg.selectAll("." + className).remove();
+
+    // Draw the line
+    svg.append("line")
+        .attr("class", className)
+        .attr("x1", scale.x(x1))
+        .attr("y1", scale.y(y1))
+        .attr("x2", scale.x(x2))
+        .attr("y2", scale.y(y2))
+        .style("stroke", "#000000")
+        .style("stroke-width", 2)
+        .style("opacity", 0.7);
+}
+
+// Modified function that extracts parameters including facet selection
 function get_params(){
     // Extract parameters for all sliders
     const sliderParams = {};
@@ -234,13 +263,17 @@ function get_params(){
     const xAxis = document.getElementById('x-axis-selector').value;
     const yAxis = document.getElementById('y-axis-selector').value;
     
+    // Get current facet selection
+    const facetColumn = document.getElementById('facet-selector').value;
+    
     // Combine all parameters
     return {
         ...sliderParams,
         'ExtracurricularActivities': extracurricularValues,
         'PlacementTraining': placementTrainingValues,
         'x_axis': xAxis,
-        'y_axis': yAxis
+        'y_axis': yAxis,
+        'facet_column': facetColumn
     };
 }
 
@@ -252,8 +285,9 @@ function update_scatter(data, svg, scale, className, color){
     draw_scatter(data, svg, scale, className, color)
 }
 
-function update(placed_svg, not_placed_svg, placed_scale, not_placed_scale){
-    params = get_params()
+// Updated update function to handle faceted data and best fit lines
+function update(chart1_svg, chart2_svg, chart1_scale, chart2_scale){
+    params = get_params();
     fetch('/update', {
         method: 'POST',
         credentials: 'include',
@@ -263,10 +297,71 @@ function update(placed_svg, not_placed_svg, placed_scale, not_placed_scale){
             'content-type': 'application/json'
         })
     }).then(async function(response){
-        var results = JSON.parse(JSON.stringify((await response.json())))
-        update_scatter(results['placed_data'], placed_svg, placed_scale, "placed-point", "#4682B4") // Blue for placed
-        update_scatter(results['not_placed_data'], not_placed_svg, not_placed_scale, "not-placed-point", "#A52A2A") // Brown for not placed
-    })
+        var results = JSON.parse(JSON.stringify((await response.json())));
+        
+        // Get facet column and values
+        const facetColumn = params.facet_column;
+        let facetValues = [];
+        
+        // Determine facet values based on selected facet column
+        if (facetColumn === 'PlacementStatus') {
+            facetValues = ['Placed', 'NotPlaced'];
+        } else if (facetColumn === 'PlacementTraining') {
+            facetValues = ['Yes', 'No'];
+        } else if (facetColumn === 'ExtracurricularActivities') {
+            facetValues = ['Yes', 'No'];
+        }
+        
+        // Update chart titles with facet information
+        d3.select("#placed-scatter-title").text(`${facetColumn}: ${facetValues[0]}`);
+        d3.select("#not-placed-scatter-title").text(`${facetColumn}: ${facetValues[1]}`);
+        
+        // Convert facet values to strings for accessing data
+        const firstValue = String(facetValues[0]);
+        const secondValue = String(facetValues[1]);
+        
+        // Update charts with faceted data
+        update_scatter(
+            results.data_groups[firstValue] || [], 
+            chart1_svg, 
+            chart1_scale, 
+            "chart1-point", 
+            "#4682B4"  // Blue for first chart
+        );
+        
+        update_scatter(
+            results.data_groups[secondValue] || [], 
+            chart2_svg, 
+            chart2_scale, 
+            "chart2-point", 
+            "#A52A2A"  // Brown for second chart
+        );
+        
+        // Add lines of best fit if they exist in the response
+        if (results.best_fit_lines) {
+            // Draw line of best fit for first facet
+            if (results.best_fit_lines[firstValue]) {
+                draw_line_of_best_fit(
+                    chart1_svg, 
+                    chart1_scale, 
+                    results.best_fit_lines[firstValue],
+                    "best-fit-1"
+                );
+            }
+            
+            // Draw line of best fit for second facet
+            if (results.best_fit_lines[secondValue]) {
+                draw_line_of_best_fit(
+                    chart2_svg, 
+                    chart2_scale, 
+                    results.best_fit_lines[secondValue],
+                    "best-fit-2"
+                );
+            }
+        }
+    }).catch(function(error) {
+        console.error('Error updating data:', error);
+    });
 }
 
 // Generate an array of tick values for a given range, aiming for a desired number of ticks. 
@@ -304,3 +399,21 @@ function generatePaddedTicks(min, max, desiredNumTicks) {
     }
     return ticks;
 }
+
+// Initialize facet selector
+function initializeFacetSelector() {
+    const facetSelector = document.getElementById('facet-selector');
+    if (facetSelector) {
+        facetSelector.addEventListener('change', function() {
+            update(chart1_svg, chart2_svg, chart1_scale, chart2_scale);
+        });
+    }
+}
+
+// Call this function when the document is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the facet selector
+    initializeFacetSelector();
+    
+    // Rest of your initialization code will be here
+});

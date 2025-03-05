@@ -5,9 +5,15 @@ import numpy as np
 app = Flask(__name__)
 continuous_columns = ['Internships', 'Projects', 'AptitudeTestScore', 'SoftSkillsRating', 'SSC_Marks', 'HSC_Marks', 'CGPA']
 discrete_columns = ['ExtracurricularActivities', 'PlacementTraining']
-extracurricular_options = [True, False]
+extracurricular_options = ['Yes', 'No']
 placement_training_options = ['Yes', 'No']
 axis_options = ['CGPA', 'AptitudeTestScore', 'SoftSkillsRating', 'SSC_Marks', 'HSC_Marks']
+# Add facet options
+facet_options = {
+    'PlacementStatus': ['Placed', 'NotPlaced'],
+    'PlacementTraining': ['Yes', 'No'],
+    'ExtracurricularActivities': ['Yes', 'No']
+}
 
 @app.route('/')
 def index():
@@ -53,7 +59,8 @@ def index():
         placement_training_options=placement_training_options,
         filter_ranges=filter_ranges,
         all_ranges=all_ranges,
-        axis_options=axis_options
+        axis_options=axis_options,
+        facet_options=facet_options  # Pass facet options to template
     )
 
 @app.route('/update', methods=["POST"])
@@ -63,7 +70,10 @@ def update():
     # Get axis selections from request, with defaults
     x_axis = request_data.get('x_axis', 'AptitudeTestScore')
     y_axis = request_data.get('y_axis', 'CGPA')
-
+    
+    # Get facet selection from request, default to PlacementStatus
+    facet_column = request_data.get('facet_column', 'PlacementStatus')
+    
     # Query template "continuous_predicate" converts the slider values to a where clause.
     continuous_predicate = ' AND '.join([f'({column} >= {request_data[column][0]} AND {column} <= {request_data[column][1]})' 
                                        for column in continuous_columns if column in request_data]) 
@@ -75,7 +85,7 @@ def update():
     extracurricular_values = request_data.get("ExtracurricularActivities", [])
     if not extracurricular_values:
         # If no extracurricular options are selected, return empty results
-        return {'placed_data': [], 'not_placed_data': []}
+        return {'data_groups': {}, 'best_fit_lines': {}}
     else:
         discrete_predicates.append(f'ExtracurricularActivities IN {tuple(extracurricular_values)}')
     
@@ -83,7 +93,7 @@ def update():
     placement_training_values = request_data.get("PlacementTraining", [])
     if not placement_training_values:
         # If no placement training options are selected, return empty results
-        return {'placed_data': [], 'not_placed_data': []}
+        return {'data_groups': {}, 'best_fit_lines': {}}
     else:
         # Convert list to proper SQL format with quotes for string values
         values_str = ", ".join([f"'{val}'" for val in placement_training_values])
@@ -93,22 +103,61 @@ def update():
 
     # Combine where clause from sliders and checkboxes
     predicate = ' AND '.join([p for p in [continuous_predicate, discrete_predicate] if p])
-
-    # Retrieve the filtered data for placed students.
-    placed_query = f'SELECT {x_axis} as x, {y_axis} as y FROM placementdata.csv WHERE {predicate} AND PlacementStatus = \'Placed\''
-    placed_results = duckdb.sql(placed_query).df()
     
-    # "placed_data" contains the filtered data for placed students that will be used to update the first scatterplot.
-    placed_data = [{'x': float(row['x']), 'y': float(row['y'])} for _, row in placed_results.iterrows()]
-
-    # Retrieve the filtered data for not placed students.
-    not_placed_query = f'SELECT {x_axis} as x, {y_axis} as y FROM placementdata.csv WHERE {predicate} AND PlacementStatus = \'NotPlaced\''
-    not_placed_results = duckdb.sql(not_placed_query).df()
+    # Get possible values for the selected facet
+    facet_values = facet_options[facet_column]
     
-    # "not_placed_data" contains the filtered data for not placed students that will be used to update the second scatterplot.
-    not_placed_data = [{'x': float(row['x']), 'y': float(row['y'])} for _, row in not_placed_results.iterrows()]
+    # Initialize result dictionaries
+    data_groups = {}
+    best_fit_lines = {}
+    
+    # For each facet value, get the data
+    for facet_value in facet_values:
+        # Format facet_value for the query (strings need quotes)
+        if isinstance(facet_value, str):
+            formatted_facet_value = f"'{facet_value}'"
+        else:
+            formatted_facet_value = str(facet_value)
+        
+        # Create where clause
+        where_clause = f"{facet_column} = {formatted_facet_value}"
+        
+        # Add predicate if it exists
+        if predicate:
+            where_clause = f"{where_clause} AND {predicate}"
+        
+        # Query for this facet value
+        query = f'SELECT {x_axis} as x, {y_axis} as y FROM placementdata.csv WHERE {where_clause}'
+        results = duckdb.sql(query).df()
+        
+        # Convert to list of points
+        points = [{'x': float(row['x']), 'y': float(row['y'])} for _, row in results.iterrows()]
+        
+        # Add to result dictionary
+        data_groups[str(facet_value)] = points
+        
+        # Calculate line of best fit if we have enough data points
+        best_fit = None
+        if results.shape[0] > 1:
+            # Convert DataFrame columns to numpy arrays for polyfit
+            x_values = results['x'].values.astype(float)
+            y_values = results['y'].values.astype(float)
+            
+            coefficients = np.polyfit(x_values, y_values, 1)
+            best_fit = {
+                'slope': float(coefficients[0]),
+                'intercept': float(coefficients[1]),
+                'min_x': float(results['x'].min()),
+                'max_x': float(results['x'].max())
+            }
+        
+        # Add best fit line to results
+        best_fit_lines[str(facet_value)] = best_fit
 
-    return {'placed_data': placed_data, 'not_placed_data': not_placed_data}
+    return {
+        'data_groups': data_groups,
+        'best_fit_lines': best_fit_lines
+    }
 
 if __name__ == "__main__":
     app.run(debug=True, port=7000)
