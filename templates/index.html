@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<header>
+<title>Placement Data Visualization</title>
+<link href="static/css/nouislider.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="static/css/style.css" media="screen" />
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="static/js/nouislider.min.js"></script>
+<script src="static/js/script.js"></script>
+<style>
+body, html {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  padding-top: 10px;
+}
+.container {
+  display: flex;
+  flex-wrap: nowrap;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+}
+.charts-container {
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+.chart-box {
+  margin: 0;
+  padding: 0;
+}
+.controls-box {
+  margin: 0;
+  padding: 0 0 0 0;
+  min-width: 250px;
+  /* max-height: 500px; */
+  overflow-y: visible; /* Changed from auto to visible */
+  position: relative;
+}
+
+h1 {
+  font-size: 22px;
+  margin-bottom: 10px;
+  text-align: center;
+  font-weight: bold;
+  width: 100%;
+  display: block;
+}
+h3 {
+  margin-top: 15px;
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: bold;
+}
+svg {
+  border: 1px solid #e0e0e0;
+  display: block;
+}
+.axis path,
+.axis line {
+  stroke: #e0e0e0;
+}
+.grid line {
+  stroke: lightgrey;
+  stroke-opacity: 0.7;
+  shape-rendering: crispEdges;
+}
+.grid path {
+  stroke-width: 0;
+}
+.tick text {
+  font-size: 10px;
+}
+.slider-container {
+  margin-bottom: 35px;
+  padding-right: 10px;
+  padding-left: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+input[type="checkbox"] {
+  transform: scale(1.5);
+  margin-right: 8px;
+}
+label {
+  font-size: 15px;
+  margin-right: 15px;
+}
+.noUi-connect {
+  background: #3a8cc1;
+}
+.noUi-handle {
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 12px;
+  top: -6px !important;
+}
+.noUi-horizontal {
+  height: 12px;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.slider-label {
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+  margin: 0 8px;
+  min-width: 25px;
+}
+
+.min-label {
+  text-align: right;
+}
+
+.max-label {
+  text-align: left;
+}
+
+/* New styles for axis selection */
+.axis-selector {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-radius: 5px;
+  border: 1px solid #e0e0e0;
+}
+
+.axis-selector select {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+</style>
+</header>
+<body>
+<!-- New: Axis Selection Controls -->
+<div style="width:90%; margin-left:5%; margin-right:5%; margin-top:20px; margin-bottom:20px; text-align:center;">
+  <div class="axis-selector" style="display:inline-block; width:40%; margin-right:5%;">
+    <h3>X-Axis Selection</h3>
+    <select id="x-axis-selector" onchange="updateAxesAndPlot()">
+      <option value="AptitudeTestScore" selected>AptitudeTestScore</option>
+      <option value="CGPA">CGPA</option>
+      <option value="SoftSkillsRating">SoftSkillsRating</option>
+      <option value="SSC_Marks">SSC_Marks</option>
+      <option value="HSC_Marks">HSC_Marks</option>
+    </select>
+  </div>
+  <div class="axis-selector" style="display:inline-block; width:40%;">
+    <h3>Y-Axis Selection</h3>
+    <select id="y-axis-selector" onchange="updateAxesAndPlot()">
+      <option value="CGPA" selected>CGPA</option>
+      <option value="AptitudeTestScore">AptitudeTestScore</option>
+      <option value="SoftSkillsRating">SoftSkillsRating</option>
+      <option value="SSC_Marks">SSC_Marks</option>
+      <option value="HSC_Marks">HSC_Marks</option>
+    </select>
+  </div>
+</div>
+
+<table cellspacing="0" cellpadding="0" border="0" style="width:90%; border-collapse: collapse; margin-left:5%; margin-right:5%; margin-top:20px; margin-bottom:50px;">
+<tr style="vertical-align: top;">
+<td style="padding:0; margin:0; vertical-align:top; text-align:center;">
+  <div id="placed-scatter"></div>
+</td>
+<td style="padding:0; margin:0; vertical-align:top; text-align:center;">
+  <div id="not-placed-scatter"></div>
+</td>
+<td style="padding:0 0 0 0; margin:0; vertical-align:top; width:340px;">
+  <div class="controls-box" style="height: auto; padding-bottom: 50px; padding-left: 5px; padding-right: 15px;">
+    <!-- Extracurricular Activities Checkbox -->
+    <div id="extracurricular" class="checkbox-group" style="margin-left: 5px; margin-top: 5px;">
+      <h3>Extracurricular Activities</h3>
+      {% for option in extracurricular_options %}
+        <div class="checkbox-item">
+          <input type="checkbox" class="checkboxExtracurricular extracurricular-selected" value="{{option}}" onchange="update_checked(this, 'ExtracurricularActivities')" checked>
+          <label>{{option}}</label>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Placement Training Checkbox -->
+    <div id="placement-training" class="checkbox-group" style="margin-left: 5px;">
+      <h3>Placement Training</h3>
+      {% for option in placement_training_options %}
+        <div class="checkbox-item">
+          <input type="checkbox" class="checkboxPlacementTraining placement-training-selected" value="{{option}}" onchange="update_checked(this, 'PlacementTraining')" checked>
+          <label>{{option}}</label>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Sliders for all continuous variables -->
+    {% for column, (min, max) in filter_ranges.items() %}
+    <div class="slider-container">
+      <h3>{{ column }}</h3>
+      <div id="{{ column }}-slider-container" style="width:100%; display: flex; align-items: center; margin-top: 10px; padding: 0 5px;">
+        <div id="{{ column }}-slider" style="flex-grow: 1; width: 85%;"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</td>
+</tr>
+</table>
+</body>
+
+<script>
+let margin = {top: 70, right: 20, bottom: 60, left: 60},
+    width = 500 - margin.left - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+// Global variables to store SVG elements and scales
+let placed_svg, not_placed_svg, placed_scale, not_placed_scale;
+
+// Initial variable ranges - will be updated based on selected axes
+let currentAxisRanges = {};
+
+// Store all axis ranges
+{% for column, (min, max) in all_ranges.items() %}
+currentAxisRanges['{{column}}'] = [{{min}}, {{max}}];
+{% endfor %}
+
+// Initialize plots with default axes
+function initializePlots() {
+    // Clear existing plots
+    d3.select('#placed-scatter').html('');
+    d3.select('#not-placed-scatter').html('');
+    
+    // Get current axis selections
+    const xAxis = document.getElementById('x-axis-selector').value;
+    const yAxis = document.getElementById('y-axis-selector').value;
+    
+    // Get ranges for selected axes
+    const xRange = currentAxisRanges[xAxis];
+    const yRange = currentAxisRanges[yAxis];
+    
+    // Create "Placed" scatterplot
+    placed_svg = draw_svg('placed-scatter', margin, width, height, "PlacementStatus: Placed");
+    placed_scale = draw_axes('placed-scatter', placed_svg, width, height, xRange, yRange);
+    add_scatterplot_elements(placed_svg, width, height, xAxis, yAxis);
+    
+    // Create "Not Placed" scatterplot
+    not_placed_svg = draw_svg('not-placed-scatter', margin, width, height, "PlacementStatus: NotPlaced");
+    not_placed_scale = draw_axes('not-placed-scatter', not_placed_svg, width, height, xRange, yRange);
+    add_scatterplot_elements(not_placed_svg, width, height, xAxis, yAxis);
+}
+
+// Function to update axes and plot when selection changes
+function updateAxesAndPlot() {
+    initializePlots();
+    
+    // Initialize sliders
+    {% for column, (min, max) in filter_ranges.items() %}
+    draw_slider('{{column}}', {{min}}, {{max}}, placed_svg, not_placed_svg, placed_scale, not_placed_scale);
+    {% endfor %}
+    
+    // Update plots with new data
+    update(placed_svg, not_placed_svg, placed_scale, not_placed_scale);
+}
+
+// Initialize plots on page load
+initializePlots();
+
+// Initialize sliders on page load
+{% for column, (min, max) in filter_ranges.items() %}
+draw_slider('{{column}}', {{min}}, {{max}}, placed_svg, not_placed_svg, placed_scale, not_placed_scale);
+{% endfor %}
+
+// Initial data load
+update(placed_svg, not_placed_svg, placed_scale, not_placed_scale);
+
+function update_checked(checkbox, type) {
+  // Use the correct class name format for the toggle
+  if (type === 'ExtracurricularActivities') {
+    checkbox.classList.toggle('extracurricular-selected');
+  } else if (type === 'PlacementTraining') {
+    checkbox.classList.toggle('placement-training-selected');
+  }
+  
+  update(placed_svg, not_placed_svg, placed_scale, not_placed_scale);
+}
+</script>
+</html>
