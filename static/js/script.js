@@ -157,36 +157,87 @@ function draw_scatter(data, svg, scale, className, color){
     
     // Remove old dots
     dots.exit().remove();
-    
-    // Add new dots
-    dots = dots.enter()
-        .append("circle")
-        .attr("class", className)
-        .merge(dots)
-        .attr("cx", function(d) { return scale.x(d.x); })
-        .attr("cy", function(d) { return scale.y(d.y); })
-        .attr("r", 2.5)
-        .style("fill", color)
-        .style("opacity", 0.5);
 
-    var simulation = d3.forceSimulation(data)
-        .force('x', d3.forceX((d) => { return scale.x(d.x); }).strength(2))
-        .force('y', d3.forceY((d) => { return scale.y(d.y); }).strength(2))
-        .force('collide', d3.forceCollide(1))
+    // Get graph-selector value
+    var graphSelector = document.getElementById('graph-selector').value;
+    console.log(graphSelector);
 
-    for (let i = 0; i < 10; i++) { simulation.tick(); }
-    
-    simulation.on('tick', function() {
-        dots
-            .attr('cx', (d) => d.x)
-            .attr('cy', (d) => d.y);
-    });
+    if (graphSelector == 1) {
+        // Add new dots
+        dots = dots.enter()
+            .append("circle")
+            .attr("class", className)
+            .merge(dots)
+            .attr("cx", function(d) { return scale.x(d.x); })
+            .attr("cy", function(d) { return scale.y(d.y); })
+            .attr("r", 2.5)
+            .style("fill", color)
+            .style("opacity", 0.5);
 
-    simulation.on('end', function() {
-        dots
-            .style('stroke', 'black')
-            .style('stroke-width', 0.5);
-    });
+        var simulation = d3.forceSimulation(data)
+            .force('x', d3.forceX((d) => { return scale.x(d.x); }).strength(2))
+            .force('y', d3.forceY((d) => { return scale.y(d.y); }).strength(2))
+            .force('collide', d3.forceCollide(1))
+
+        for (let i = 0; i < 10; i++) { simulation.tick(); }
+
+        simulation.on('tick', function() {
+            dots
+                .attr('cx', (d) => d.x)
+                .attr('cy', (d) => d.y);
+        });
+
+        simulation.on('end', function() {
+            dots
+                .style('stroke', 'black')
+                .style('stroke-width', 0.5);
+        });
+    }
+    else if (graphSelector == 2) {
+        // compute the density data
+        var densityData = d3.contourDensity()
+            .x(function(d) { return scale.x(d.x); })
+            .y(function(d) { return scale.y(d.y); })
+            .size([width, height])
+            .bandwidth(10)
+            (data);
+
+        var colorScaler = d3.scaleLinear()
+            .domain([0, 1]) // Points per square pixel.
+            .range(["white", color]);
+
+        svg
+            .selectAll("path")
+            .data(densityData)
+            .enter()
+            .append("path")
+              .attr("d", d3.geoPath())
+              .attr("fill", "none")
+              .attr("stroke", "#69b3a2")
+              .attr("stroke-linejoin", "round")
+              .attr("class", className)
+    }
+    else if (graphSelector == 3) {
+    // compute the density data
+        var densityData = d3.contourDensity()
+            .x(function(d) { return scale.x(d.x); })
+            .y(function(d) { return scale.y(d.y); })
+            .size([width, height])
+            .bandwidth(10)
+            (data);
+
+        var colorScaler = d3.scaleLinear()
+            .domain([0, 1]) // Points per square pixel.
+            .range(["white", color]);
+
+        // draw the contour
+        svg.insert("g", "g")
+            .selectAll("path")
+            .data(densityData)
+            .enter().append("path")
+            .attr("d", d3.geoPath())
+            .attr("fill", function(d) { console.log(colorScaler(d.value)); return colorScaler(d.value); });
+    }
 }
 
 // Add a title and legend to a scatterplot with dynamic axis labels
