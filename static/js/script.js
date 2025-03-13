@@ -105,7 +105,7 @@ function draw_slider(column, min, max, chart1_svg, chart2_svg, chart1_scale, cha
     let stepSize;
     let tooltipsConfig;
     
-    if (column === 'SoftSkillsRating') {
+    if (column === 'SoftSkillsRating' || column === 'CGPA') {
         // Use 0.1 step for SoftSkillsRating
         stepSize = 0.1;
         // Only show tooltip when slider is being used
