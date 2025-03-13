@@ -41,9 +41,15 @@ def index():
         min_val = range_results.iloc[0, 0]
         max_val = range_results.iloc[0, 1]
         
-        # For SoftSkillsRating, keep decimal precision
-        # For other columns, round to integers
-        if column != 'SoftSkillsRating':
+        # For SoftSkillsRating and CGPA, keep decimal precision
+        if column == 'CGPA':
+            # Add a 0.1 buffer to ensure all points are included
+            min_val = float(min_val) - 0.1
+            max_val = float(max_val) + 0.1
+            # Round to 1 decimal place
+            min_val = round(min_val, 1)
+            max_val = round(max_val, 1)
+        elif column != 'SoftSkillsRating':
             min_val = int(min_val)
             max_val = int(max_val)
         else:

@@ -106,11 +106,16 @@ function draw_slider(column, min, max, chart1_svg, chart2_svg, chart1_scale, cha
     let tooltipsConfig;
     
     if (column === 'SoftSkillsRating' || column === 'CGPA') {
+        // Preserve decimal precision for slider 
+        min = parseFloat(min).toFixed(1);  
+        max = parseFloat(max).toFixed(1);
         // Use 0.1 step for SoftSkillsRating
         stepSize = 0.1;
         // Only show tooltip when slider is being used
         tooltipsConfig = true;
     } else {
+        min = parseInt(min);
+        max = parseInt(max);
         stepSize = 1;
         tooltipsConfig = true;
     }
@@ -120,7 +125,8 @@ function draw_slider(column, min, max, chart1_svg, chart2_svg, chart1_scale, cha
       connect: true,
       tooltips: tooltipsConfig,
       step: stepSize,
-      range: {'min': min, 'max': max}
+    //   range: {'min': min, 'max': max}
+      range: {'min': parseFloat(min), 'max': parseFloat(max)}
     });
     
     // Add min and max value labels with improved positioning
