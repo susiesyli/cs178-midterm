@@ -162,7 +162,7 @@ function draw_scatter(data, svg, scale, className, color){
     var graphSelector = document.getElementById('graph-selector').value;
     console.log(graphSelector);
 
-    if (graphSelector == 1) {
+    if (graphSelector == 4) {   // scatter plot with force layout
         // Add new dots
         dots = dots.enter()
             .append("circle")
@@ -193,7 +193,7 @@ function draw_scatter(data, svg, scale, className, color){
                 .style('stroke-width', 0.5);
         });
     }
-    else if (graphSelector == 2) {
+    else if (graphSelector == 2) {  // density plot
         // compute the density data
         var densityData = d3.contourDensity()
             .x(function(d) { return scale.x(d.x); })
@@ -217,13 +217,13 @@ function draw_scatter(data, svg, scale, className, color){
               .attr("stroke-linejoin", "round")
               .attr("class", className)
     }
-    else if (graphSelector == 3) {
+    else if (graphSelector == 3) {  // contour plot
     // compute the density data
         var densityData = d3.contourDensity()
             .x(function(d) { return scale.x(d.x); })
             .y(function(d) { return scale.y(d.y); })
             .size([width, height])
-            .bandwidth(10)
+            .bandwidth(1)
             (data);
 
         var colorScaler = d3.scaleLinear()
@@ -237,6 +237,37 @@ function draw_scatter(data, svg, scale, className, color){
             .enter().append("path")
             .attr("d", d3.geoPath())
             .attr("fill", function(d) { console.log(colorScaler(d.value)); return colorScaler(d.value); });
+    }
+    else if (graphSelector == 1) {  // bubble plot
+        // Create a map to count occurrences of each (x, y) pair
+        const countMap = new Map();
+        data.forEach(d => {
+            const key = `${d.x},${d.y}`;
+            if (countMap.has(key)) {
+            countMap.set(key, countMap.get(key) + 1);
+            } else {
+            countMap.set(key, 1);
+            }
+        });
+
+        // Convert the map back to an array of objects with x, y, and cnt
+        const newData = Array.from(countMap, ([key, cnt]) => {
+            const [x, y] = key.split(',').map(Number);
+            return { x, y, cnt };
+        });
+
+        console.log(newData);
+
+        svg.selectAll("." + className)
+            .data(newData)
+            .enter()
+            .append("circle")
+            .attr("class", className)
+            .attr("cx", function(d) { return scale.x(d.x); })
+            .attr("cy", function(d) { return scale.y(d.y); })
+            .attr("r", function(d) { return Math.sqrt(d.cnt); })
+            .style("fill", color)
+            .style("opacity", 0.5);
     }
 }
 
